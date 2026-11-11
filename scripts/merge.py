@@ -12,6 +12,9 @@ IPTV_ORG = "https://iptv-org.github.io/iptv/countries/{}.m3u"
 # iptv-org code -> group name (Korea/Indonesia match Free-TV's own groups)
 COUNTRIES = {"my": "Malaysia", "sg": "Singapore", "kr": "Korea", "id": "Indonesia"}
 
+# Malaysia is the default group; these come first, so TV1 is channel 1
+MY_FIRST = ["TV1", "TV2", "Berita RTM", "Okey"]
+
 GROUP_RE = re.compile(r'group-title="[^"]*"')
 
 
@@ -38,6 +41,14 @@ def entries(text):
             info, extra = None, []
 
 
+def my_rank(info):
+    title = info.rsplit(",", 1)[-1]
+    for i, name in enumerate(MY_FIRST):
+        if title.startswith(name):
+            return i
+    return len(MY_FIRST)
+
+
 def with_group(info, group):
     if GROUP_RE.search(info):
         return GROUP_RE.sub(f'group-title="{group}"', info, count=1)
@@ -48,7 +59,10 @@ def main(out_path):
     seen, out, counts = set(), ["#EXTM3U"], {}
     asian = []
     for code, name in COUNTRIES.items():
-        for info, extra, url in entries(fetch(IPTV_ORG.format(code))):
+        chans = list(entries(fetch(IPTV_ORG.format(code))))
+        if code == "my":
+            chans.sort(key=lambda c: my_rank(c[0]))
+        for info, extra, url in chans:
             asian.append((with_group(info, name), extra, url, name))
     free = [(i, e, u, None) for i, e, u in entries(fetch(FREE_TV))]
     # Asian groups first so they sit near the top of the group list
